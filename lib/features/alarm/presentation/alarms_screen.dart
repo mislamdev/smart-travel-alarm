@@ -2,44 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../common_widgets/app_gradient_background.dart';
-import '../../../common_widgets/gradient_button.dart';
 import '../../../helpers/date_time_formatters.dart';
 import 'alarm_controller.dart';
+import 'alarm_details_screen.dart';
+import 'widgets/add_alarm_dialog.dart';
 import 'widgets/alarm_tile.dart';
 
 class AlarmsScreen extends ConsumerWidget {
   const AlarmsScreen({super.key});
-
-  Future<DateTime?> _pickDateTime(BuildContext context) async {
-    final now = DateTime.now();
-
-    final date = await showDatePicker(
-      context: context,
-      firstDate: now,
-      lastDate: DateTime(now.year + 5),
-      initialDate: now,
-    );
-    if (date == null) return null;
-
-    if (!context.mounted) return null;
-
-    final time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(now.add(const Duration(minutes: 1))),
-    );
-    if (time == null) return null;
-
-    final dt = DateTime(
-      date.year,
-      date.month,
-      date.day,
-      time.hour,
-      time.minute,
-    );
-    if (dt.isBefore(DateTime.now())) return null;
-
-    return dt;
-  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -48,15 +18,25 @@ class AlarmsScreen extends ConsumerWidget {
 
     return Scaffold(
       extendBodyBehindAppBar: true,
-      // appBar: AppBar(backgroundColor: Colors.transparent, elevation: 0),
 
       // ✅ Styled FAB but same behavior as before
       floatingActionButton: GestureDetector(
         onTap: () async {
-          final dt = await _pickDateTime(context);
-          if (dt == null) return;
+          final result = await showDialog<Map<String, dynamic>>(
+            context: context,
+            builder: (context) => const AddAlarmDialog(),
+          );
 
-          await ref.read(alarmsControllerProvider.notifier).addAlarm(dt);
+          if (result == null) return;
+
+          await ref
+              .read(alarmsControllerProvider.notifier)
+              .addAlarm(
+                result['dateTime'] as DateTime,
+                title: result['title'] as String?,
+                location: result['location'] as String?,
+                description: result['description'] as String?,
+              );
 
           if (context.mounted) {
             ScaffoldMessenger.of(
@@ -84,13 +64,30 @@ class AlarmsScreen extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Selected Location',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
-                ),
+              // Selected Location title with About button
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Selected Location',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () {
+                      Navigator.of(context).pushNamed('/about');
+                    },
+                    icon: const Icon(
+                      Icons.info_outline,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                    tooltip: 'About',
+                  ),
+                ],
               ),
               const SizedBox(height: 12),
 
@@ -140,50 +137,6 @@ class AlarmsScreen extends ConsumerWidget {
                     ],
                   ),
                 ),
-              ),
-
-              const SizedBox(height: 12),
-
-              GradientButton(
-                text: "Use Current Location",
-                icon: Icons.location_on_outlined,
-                iconOnRight: true,
-                outlined: true,
-                onTap: () async {
-                  try {
-                    // Show loading indicator
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Fetching current location...'),
-                        duration: Duration(seconds: 2),
-                      ),
-                    );
-
-                    // Fetch current location using the controller
-                    await ref
-                        .read(alarmsControllerProvider.notifier)
-                        .fetchCurrentLocation();
-
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).clearSnackBars();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Location updated successfully'),
-                        ),
-                      );
-                    }
-                  } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).clearSnackBars();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Error: ${e.toString()}'),
-                          backgroundColor: Colors.redAccent,
-                        ),
-                      );
-                    }
-                  }
-                },
               ),
 
               const SizedBox(height: 24),
@@ -240,45 +193,95 @@ class AlarmsScreen extends ConsumerWidget {
                                 }),
                               ),
                             ),
-                            child: Opacity(
-                              opacity: alarm.enabled ? 1 : 0.75,
-                              child: AlarmTile(
-                                alarm: alarm,
-                                onToggle: (v) => ref
-                                    .read(alarmsControllerProvider.notifier)
-                                    .toggleAlarm(alarm.id, v),
-                                onDelete: () async {
-                                  final shouldDelete = await showDialog<bool>(
-                                    context: context,
-                                    builder: (context) => AlertDialog(
-                                      title: const Text('Delete Alarm'),
-                                      content: Text(
-                                        'Are you sure you want to delete the alarm scheduled for ${DateTimeFormatters.time(alarm.scheduledAt)} on ${DateTimeFormatters.date(alarm.scheduledAt)}?',
-                                      ),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () =>
-                                              Navigator.of(context).pop(false),
-                                          child: const Text('Cancel'),
-                                        ),
-                                        TextButton(
-                                          onPressed: () =>
-                                              Navigator.of(context).pop(true),
-                                          style: TextButton.styleFrom(
-                                            foregroundColor: Colors.red,
-                                          ),
-                                          child: const Text('Delete'),
-                                        ),
-                                      ],
+                            child: Dismissible(
+                              key: Key(alarm.id.toString()),
+                              direction: DismissDirection.endToStart,
+                              background: Container(
+                                margin: const EdgeInsets.only(bottom: 12),
+                                padding: const EdgeInsets.only(right: 20),
+                                decoration: BoxDecoration(
+                                  color: Colors.redAccent,
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                alignment: Alignment.centerRight,
+                                child: const Icon(
+                                  Icons.delete_outline,
+                                  color: Colors.white,
+                                  size: 32,
+                                ),
+                              ),
+                              confirmDismiss: (direction) async {
+                                final shouldDelete = await showDialog<bool>(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    title: const Text('Delete Alarm'),
+                                    content: Text(
+                                      'Are you sure you want to delete the alarm scheduled for ${DateTimeFormatters.time(alarm.scheduledAt)} on ${DateTimeFormatters.date(alarm.scheduledAt)}?',
                                     ),
-                                  );
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.of(context).pop(false),
+                                        child: const Text('Cancel'),
+                                      ),
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.of(context).pop(true),
+                                        style: TextButton.styleFrom(
+                                          foregroundColor: Colors.red,
+                                        ),
+                                        child: const Text('Delete'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                return shouldDelete ?? false;
+                              },
+                              onDismissed: (direction) {
+                                // Store the deleted alarm for undo functionality
+                                final deletedAlarm = alarm;
 
-                                  if (shouldDelete == true) {
-                                    ref
-                                        .read(alarmsControllerProvider.notifier)
-                                        .deleteAlarm(alarm.id);
-                                  }
-                                },
+                                ref
+                                    .read(alarmsControllerProvider.notifier)
+                                    .deleteAlarm(alarm.id);
+
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: const Text('Alarm deleted'),
+                                    duration: const Duration(seconds: 4),
+                                    action: SnackBarAction(
+                                      label: 'UNDO',
+                                      onPressed: () {
+                                        // Restore the deleted alarm
+                                        ref
+                                            .read(
+                                              alarmsControllerProvider.notifier,
+                                            )
+                                            .restoreAlarm(deletedAlarm);
+                                      },
+                                    ),
+                                  ),
+                                );
+                              },
+                              child: Opacity(
+                                opacity: alarm.enabled ? 1 : 0.75,
+                                child: AlarmTile(
+                                  alarm: alarm,
+                                  onToggle: (v) => ref
+                                      .read(alarmsControllerProvider.notifier)
+                                      .toggleAlarm(alarm.id, v),
+                                  onDelete: () {},
+                                  // No longer used but keeping for compatibility
+                                  onTap: () {
+                                    // Navigate to alarm details screen
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            AlarmDetailsScreen(alarm: alarm),
+                                      ),
+                                    );
+                                  },
+                                ),
                               ),
                             ),
                           );

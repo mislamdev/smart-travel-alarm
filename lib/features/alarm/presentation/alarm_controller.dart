@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 import '../../../features/location/data/location_service.dart';
 import '../data/notification_service.dart';
@@ -10,7 +11,7 @@ final selectedLocationProvider = StateProvider<String?>((ref) => null);
 
 final alarmsControllerProvider =
     StateNotifierProvider<AlarmsController, List<Alarm>>(
-      (ref) => AlarmsController(ref),
+      (ref) => AlarmsController(ref)..loadAlarms(),
     );
 
 class AlarmsController extends StateNotifier<List<Alarm>> {
@@ -18,6 +19,14 @@ class AlarmsController extends StateNotifier<List<Alarm>> {
 
   final Ref _ref;
   final _locationService = LocationService();
+  final _alarmsBox = Hive.box<Alarm>('alarms');
+
+  // Load alarms from Hive on initialization
+  void loadAlarms() {
+    final alarms = _alarmsBox.values.toList();
+    alarms.sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
+    state = alarms;
+  }
 
   int _nextId() {
     // In production: use incrementing id or UUID->hash.
@@ -34,16 +43,33 @@ class AlarmsController extends StateNotifier<List<Alarm>> {
     _ref.read(selectedLocationProvider.notifier).state = locationString;
   }
 
-  Future<void> addAlarm(DateTime dt) async {
-    final alarm = Alarm(id: _nextId(), scheduledAt: dt, enabled: true);
+  Future<void> addAlarm(
+    DateTime dt, {
+    String? title,
+    String? description,
+    String? location,
+  }) async {
+    final alarm = Alarm(
+      id: _nextId(),
+      scheduledAt: dt,
+      enabled: true,
+      title: title,
+      description: description,
+      location: location,
+    );
+
+    // Save to Hive
+    await _alarmsBox.put(alarm.id, alarm);
+
+    // Update state
     state = [...state, alarm]
       ..sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
 
     await NotificationService.instance.scheduleAlarm(
       id: alarm.id,
       dateTime: alarm.scheduledAt,
-      title: 'Travel Alarm',
-      body: 'It’s time! (${alarm.scheduledAt})',
+      title: title ?? 'Travel Alarm',
+      body: description ?? "It's time! (${alarm.scheduledAt})",
     );
   }
 
@@ -52,6 +78,11 @@ class AlarmsController extends StateNotifier<List<Alarm>> {
     if (idx == -1) return;
 
     final updated = state[idx].copyWith(enabled: enabled);
+
+    // Update in Hive
+    await _alarmsBox.put(id, updated);
+
+    // Update state
     final newList = [...state];
     newList[idx] = updated;
     state = newList;
@@ -63,13 +94,63 @@ class AlarmsController extends StateNotifier<List<Alarm>> {
         id: id,
         dateTime: updated.scheduledAt,
         title: 'Travel Alarm',
-        body: 'It’s time! (${updated.scheduledAt})',
+        body: "It's time! (${updated.scheduledAt})",
       );
     }
   }
 
   Future<void> deleteAlarm(int id) async {
+    // Delete from Hive
+    await _alarmsBox.delete(id);
+
+    // Update state
     state = state.where((a) => a.id != id).toList();
+
     await NotificationService.instance.cancel(id);
+  }
+
+  Future<void> updateAlarm(Alarm updatedAlarm) async {
+    final idx = state.indexWhere((a) => a.id == updatedAlarm.id);
+    if (idx == -1) return;
+
+    // Update in Hive
+    await _alarmsBox.put(updatedAlarm.id, updatedAlarm);
+
+    // Update state
+    final newList = [...state];
+    newList[idx] = updatedAlarm;
+    state = newList..sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
+
+    // Cancel old notification and reschedule if enabled
+    await NotificationService.instance.cancel(updatedAlarm.id);
+    if (updatedAlarm.enabled) {
+      await NotificationService.instance.scheduleAlarm(
+        id: updatedAlarm.id,
+        dateTime: updatedAlarm.scheduledAt,
+        title: updatedAlarm.title ?? 'Travel Alarm',
+        body:
+            updatedAlarm.description ??
+            "It's time! (${updatedAlarm.scheduledAt})",
+      );
+    }
+  }
+
+  Future<void> restoreAlarm(Alarm alarm) async {
+    // Restore to Hive
+    await _alarmsBox.put(alarm.id, alarm);
+
+    // Update state
+    state = [...state, alarm]
+      ..sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
+
+    // Reschedule notification if alarm was enabled
+    if (alarm.enabled) {
+      await NotificationService.instance.scheduleAlarm(
+        id: alarm.id,
+        dateTime: alarm.scheduledAt,
+        title: 'Travel Alarm',
+        body: "It's time! (${alarm.scheduledAt})",
+      );
+    }
   }
 }

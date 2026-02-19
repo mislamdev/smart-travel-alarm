@@ -2,6 +2,7 @@ import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 import '../../../common_widgets/app_gradient_background.dart';
 import '../../../common_widgets/gradient_button.dart';
@@ -72,6 +73,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   void _goToLocation() {
+    // Save onboarding completion status
+    final settingsBox = Hive.box('settings');
+    settingsBox.put('onboarding_completed', true);
+
     Navigator.of(context).pushReplacementNamed(AppRoutes.location);
   }
 

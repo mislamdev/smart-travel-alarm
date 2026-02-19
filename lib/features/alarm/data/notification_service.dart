@@ -28,7 +28,13 @@ class NotificationService {
       android: androidInit,
       iOS: iosInit,
     );
-    await _plugin.initialize(initSettings);
+    await _plugin.initialize(
+      initSettings,
+      onDidReceiveNotificationResponse: (NotificationResponse response) {
+        // Handle notification tap
+        debugPrint('Notification tapped: ${response.payload}');
+      },
+    );
 
     // Android 13+ notification permission can be requested (optional).
     await _plugin
