@@ -31,7 +31,7 @@ class GradientButton extends StatelessWidget {
                   colors: [Color(0xFF6A00FF), Color(0xFF9C00FF)],
                 ),
           border: outlined
-              ? Border.all(color: Colors.white.withOpacity(.4))
+              ? Border.all(color: Colors.white.withValues(alpha: 0.4))
               : null,
         ),
         alignment: Alignment.center,

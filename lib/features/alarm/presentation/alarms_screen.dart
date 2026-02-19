@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../common_widgets/app_gradient_background.dart';
 import '../../../common_widgets/gradient_button.dart';
+import '../../../helpers/date_time_formatters.dart';
 import 'alarm_controller.dart';
 import 'widgets/alarm_tile.dart';
 
@@ -19,6 +20,8 @@ class AlarmsScreen extends ConsumerWidget {
       initialDate: now,
     );
     if (date == null) return null;
+
+    if (!context.mounted) return null;
 
     final time = await showTimePicker(
       context: context,
@@ -103,10 +106,10 @@ class AlarmsScreen extends ConsumerWidget {
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(horizontal: 18),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(.08),
+                    color: Colors.white.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(40),
                     border: Border.all(
-                      color: Colors.white.withOpacity(.15),
+                      color: Colors.white.withValues(alpha: 0.15),
                       width: 1,
                     ),
                   ),
@@ -115,7 +118,7 @@ class AlarmsScreen extends ConsumerWidget {
                     children: [
                       Icon(
                         Icons.location_on_outlined,
-                        color: Colors.white.withOpacity(.75),
+                        color: Colors.white.withValues(alpha: 0.75),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
@@ -124,14 +127,14 @@ class AlarmsScreen extends ConsumerWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            color: Colors.white.withOpacity(.7),
+                            color: Colors.white.withValues(alpha: 0.7),
                             fontSize: 15,
                           ),
                         ),
                       ),
                       Icon(
                         Icons.edit_outlined,
-                        color: Colors.white.withOpacity(.5),
+                        color: Colors.white.withValues(alpha: 0.5),
                         size: 20,
                       ),
                     ],
@@ -202,7 +205,7 @@ class AlarmsScreen extends ConsumerWidget {
                           'No alarms yet.\nTap + to add one.',
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                            color: Colors.white.withOpacity(.8),
+                            color: Colors.white.withValues(alpha: 0.8),
                             fontSize: 16,
                             height: 1.4,
                           ),
@@ -223,7 +226,7 @@ class AlarmsScreen extends ConsumerWidget {
                                   if (s.contains(WidgetState.selected)) {
                                     return const Color(0xFF6A00FF);
                                   }
-                                  return Colors.white.withOpacity(.65);
+                                  return Colors.white.withValues(alpha: 0.65);
                                 }),
                                 trackColor: WidgetStateProperty.resolveWith((
                                   s,
@@ -231,9 +234,9 @@ class AlarmsScreen extends ConsumerWidget {
                                   if (s.contains(WidgetState.selected)) {
                                     return const Color(
                                       0xFF9C00FF,
-                                    ).withOpacity(.5);
+                                    ).withValues(alpha: 0.5);
                                   }
-                                  return Colors.white.withOpacity(.18);
+                                  return Colors.white.withValues(alpha: 0.18);
                                 }),
                               ),
                             ),
@@ -244,9 +247,38 @@ class AlarmsScreen extends ConsumerWidget {
                                 onToggle: (v) => ref
                                     .read(alarmsControllerProvider.notifier)
                                     .toggleAlarm(alarm.id, v),
-                                onDelete: () => ref
-                                    .read(alarmsControllerProvider.notifier)
-                                    .deleteAlarm(alarm.id),
+                                onDelete: () async {
+                                  final shouldDelete = await showDialog<bool>(
+                                    context: context,
+                                    builder: (context) => AlertDialog(
+                                      title: const Text('Delete Alarm'),
+                                      content: Text(
+                                        'Are you sure you want to delete the alarm scheduled for ${DateTimeFormatters.time(alarm.scheduledAt)} on ${DateTimeFormatters.date(alarm.scheduledAt)}?',
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.of(context).pop(false),
+                                          child: const Text('Cancel'),
+                                        ),
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.of(context).pop(true),
+                                          style: TextButton.styleFrom(
+                                            foregroundColor: Colors.red,
+                                          ),
+                                          child: const Text('Delete'),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+
+                                  if (shouldDelete == true) {
+                                    ref
+                                        .read(alarmsControllerProvider.notifier)
+                                        .deleteAlarm(alarm.id);
+                                  }
+                                },
                               ),
                             ),
                           );

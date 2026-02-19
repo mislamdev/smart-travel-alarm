@@ -40,7 +40,7 @@ class LocationScreen extends ConsumerWidget {
                 style: TextStyle(
                   fontSize: 16,
                   height: 1.35,
-                  color: Colors.white.withOpacity(.8),
+                  color: Colors.white.withValues(alpha: 0.8),
                 ),
               ),
 
@@ -70,7 +70,7 @@ class LocationScreen extends ConsumerWidget {
                   "${state.error}",
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: Colors.redAccent.withOpacity(.9),
+                    color: Colors.redAccent.withValues(alpha: 0.9),
                     fontSize: 13,
                   ),
                 ),

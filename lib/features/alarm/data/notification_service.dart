@@ -1,5 +1,6 @@
 import 'dart:io' show Platform;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
@@ -45,7 +46,7 @@ class NotificationService {
   }) async {
     // On Linux, just log the alarm (no actual notification scheduling)
     if (Platform.isLinux) {
-      print('Mock alarm scheduled for $dateTime: $title - $body');
+      debugPrint('Mock alarm scheduled for $dateTime: $title - $body');
       return;
     }
 
@@ -81,7 +82,7 @@ class NotificationService {
 
   Future<void> cancel(int id) async {
     if (Platform.isLinux) {
-      print('Mock alarm cancelled: $id');
+      debugPrint('Mock alarm cancelled: $id');
       return;
     }
     await _plugin.cancel(id);

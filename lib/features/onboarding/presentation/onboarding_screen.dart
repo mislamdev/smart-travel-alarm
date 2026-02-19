@@ -147,7 +147,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                               style: TextStyle(
                                 fontSize: 14,
                                 height: 1.45,
-                                color: Colors.white.withOpacity(.78),
+                                color: Colors.white.withValues(alpha: 0.78),
                               ),
                             ),
                             const SizedBox(height: 24),
@@ -166,7 +166,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                   decoration: BoxDecoration(
                                     color: dot == index
                                         ? const Color(0xFF6A00FF)
-                                        : Colors.white.withOpacity(.25),
+                                        : Colors.white.withValues(alpha: 0.25),
                                     shape: BoxShape.circle,
                                   ),
                                 ),
